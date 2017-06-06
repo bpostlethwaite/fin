@@ -1,3 +1,5 @@
+package finpony
+
 import (
 	"context"
 	"fmt"
@@ -12,6 +14,7 @@ const (
 	GOOGLE_SPREADSHEET_URL = "https://www.googleapis.com/auth/spreadsheets"
 	TX_TABLE               = "Transactions"
 	CAT_TABLE              = "Categories"
+	TX_CAT_TABLE           = "TransactionCategories"
 )
 
 type Store struct {
@@ -38,7 +41,7 @@ func (s *Store) ReadTransactionTable(sheetId, readRange string) ([]Record, error
 			txs = append(txs, rec)
 		}
 	} else {
-		return []Record{}, fmt.Errorf("No data found in spreadsheet %s", sheetId)
+		return []Record{}, nil
 	}
 
 	return txs, nil

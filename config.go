@@ -9,10 +9,7 @@ import (
 )
 
 const (
-	TXS_TABLE      = "transaction_table.csv"
-	CATEGORY_TABLE = "category_table.csv"
-	TX_CAT_TABLE   = "transaction_category_table.csv"
-	CONFIG_FILE    = "config.toml"
+	CONFIG_FILE = "config.toml"
 )
 
 type finponyConf struct {
@@ -23,8 +20,7 @@ type finponyConf struct {
 
 type dataInfo struct {
 	Raw     string `toml:"raw_data"`
-	Tables  string `toml:"table_data"`
-	TableId string `toml:"table_id"`
+	SheetId string `toml:"sheet_id"`
 }
 
 type credInfo struct {

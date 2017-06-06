@@ -2,16 +2,31 @@ package main
 
 import (
 	"encoding/csv"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"path"
+	"regexp"
 	"sort"
+	"strings"
 
 	"github.com/bpostlethwaite/finpony"
 )
 
-var fail = finpony.Fail
+var (
+	withAddr   *regexp.Regexp = regexp.MustCompile("(.*)\\s+(#.*)")
+	withDigits *regexp.Regexp = regexp.MustCompile("(.*)\\s+([0-9]+(-?[0-9]+)+\\s+.*)")
+	cities     [10]string     = [10]string{
+		"MONTREAL", "MAGOG", "VANCOUVER", "TORONTO", "BOLTON", "CALGARY",
+		"MISSISSAUGA", "CANMORE", "OUTREMONT", "CHAMBLY",
+	}
+)
+
+type Match struct {
+	Name string
+	Desc string
+}
 
 func readRawTx() ([]finpony.Record, error) {
 	records := []finpony.Record{}
@@ -74,19 +89,69 @@ func readRawTx() ([]finpony.Record, error) {
 	return records, nil
 }
 
+func toUpper(recs []finpony.Record) []finpony.Record {
+	frecs := []finpony.Record{}
+
+	for _, r := range recs {
+		r.Name = strings.ToUpper(r.Name)
+		frecs = append(frecs, r)
+	}
+
+	return frecs
+}
+
+func unEscape(recs []finpony.Record) []finpony.Record {
+	frecs := []finpony.Record{}
+	replacer := strings.NewReplacer("&amp;", "&")
+	for _, r := range recs {
+		r.Name = replacer.Replace(r.Name)
+		frecs = append(frecs, r)
+	}
+
+	return frecs
+}
+
 func filterDuplicates(recs []finpony.Record) []finpony.Record {
 	seen := make(map[string]bool)
 	frecs := []finpony.Record{}
 
-	for _, r := range recs {
-		k := r.Key()
+	for _, rec := range recs {
+		k := rec.Key()
 		if _, ok := seen[k]; !ok {
 			seen[k] = true
-			frecs = append(frecs, r)
+			frecs = append(frecs, rec)
 		}
 	}
 
 	return frecs
+}
+
+func extractName(n string) *Match {
+	matches := withAddr.FindStringSubmatch(n)
+	if len(matches) > 2 {
+		return &Match{matches[1], matches[2]}
+	}
+
+	matches = withDigits.FindStringSubmatch(n)
+	if len(matches) > 2 {
+		return &Match{matches[1], matches[2]}
+	}
+
+	for _, c := range cities {
+		withCity := regexp.MustCompile(fmt.Sprintf("(.*)\\s+(%s.*)", c))
+		matches := withCity.FindStringSubmatch(n)
+		if len(matches) > 2 {
+			return &Match{matches[1], matches[2]}
+		}
+	}
+
+	return nil
+}
+
+func printTxs(txs []finpony.Record) {
+	for _, tx := range txs {
+		fmt.Println(tx)
+	}
 }
 
 func main() {
@@ -97,16 +162,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// do basic clean up
-	sort.Sort(finpony.ByDate(rawtxs))
-	rawtxs = filterDuplicates(rawtxs)
-
-	// separate company names out of descriptions
+	rawtxs = unEscape(rawtxs)
+	rawtxs = toUpper(rawtxs)
 
 	store := finpony.NewStore()
 
 	// read in transactions held in Google Docs
-	spreadsheetId := finpony.ConfigData().TableId
+	spreadsheetId := finpony.ConfigData().SheetId
 	readRange := finpony.TX_TABLE // all values
 
 	txs, err := store.ReadTransactionTable(spreadsheetId, readRange)
@@ -116,8 +178,8 @@ func main() {
 
 	// append sort and dedupe
 	txs = append(txs, rawtxs...)
-	sort.Sort(finpony.ByDate(txs))
 	txs = filterDuplicates(txs)
+	sort.Sort(finpony.ByDate(txs))
 
 	// write back to sheet
 	writeRange := readRange

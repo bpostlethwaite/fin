@@ -9,13 +9,14 @@ import (
 const DATE_FORMAT = "2006-1-2"
 
 type RowIndicies struct {
-	Date       int64
-	Name       int64
-	Dollar     int64
+	Date       int
+	Name       int
+	Dollar     int
 	DateFormat string
 }
 
 func (ri RowIndicies) RecordFromRow(row []string) (Record, error) {
+
 	date, err := time.Parse(ri.DateFormat, row[ri.Date])
 	if err != nil {
 		return Record{}, err
@@ -36,10 +37,9 @@ func (ri RowIndicies) RecordFromRow(row []string) (Record, error) {
 }
 
 type Record struct {
-	Date   time.Time `csv:"Date"`
-	Name   string    `csv:"Description"`
-	Dollar float64   `csv:"Value"`
-	Type   string
+	Date   time.Time
+	Name   string
+	Dollar float64
 }
 
 func (r Record) Key() string {
@@ -54,7 +54,7 @@ func (r Record) Row() []interface{} {
 	return []interface{}{
 		r.Date.Format(DATE_FORMAT),
 		r.Name,
-		r.Dollar, // strconv.FormatFloat(r.Dollar, 'f', -1, 64)
+		r.Dollar,
 	}
 }
 
