@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"sort"
 	"strings"
 )
 
@@ -92,21 +91,6 @@ func unEscape(recs []Record) []Record {
 	return frecs
 }
 
-func filterDuplicates(recs []Record) []Record {
-	seen := make(map[string]bool)
-	frecs := []Record{}
-
-	for _, rec := range recs {
-		k := rec.Key()
-		if _, ok := seen[k]; !ok {
-			seen[k] = true
-			frecs = append(frecs, rec)
-		}
-	}
-
-	return frecs
-}
-
 func Ingest() error {
 
 	// injest raw input transactions
@@ -118,23 +102,20 @@ func Ingest() error {
 	rawtxs = unEscape(rawtxs)
 	rawtxs = toUpper(rawtxs)
 
-	store := NewStore()
+	store := NewStore(ConfigData().SheetId)
 
 	// read in transactions held in Google Docs
-	spreadsheetId := ConfigData().SheetId
-	readRange := TX_TABLE // all values
 
-	txs, err := store.ReadTransactionTable(spreadsheetId, readRange)
+	txs, err := store.ReadTransactionTable()
 	if err != nil {
 		return err
 	}
 
-	// append sort and dedupe
-	txs = append(txs, rawtxs...)
-	txs = filterDuplicates(txs)
-	sort.Sort(ByDate(txs))
+	// Append sort and dedupe. Always prepend rawtxs before txs so we keep
+	// changes in txs not present in the raw data itself when filtering.
+	// Filtering takes the more "recent" matching record.
+	txs = AppendDedupeSort(rawtxs, txs)
 
 	// write back to sheet
-	writeRange := readRange
-	return store.WriteTransactionTable(spreadsheetId, writeRange, txs)
+	return store.WriteTransactionTable(txs)
 }
