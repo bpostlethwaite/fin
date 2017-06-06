@@ -9,6 +9,10 @@ import (
 	kingpin "gopkg.in/alecthomas/kingpin.v2"
 )
 
+const (
+	UNCATEGORIZED = "Uncategorized"
+)
+
 var (
 	DEFAULT_CONFIG = path.Join(os.Getenv("HOME"), ".fin.toml")
 
@@ -19,6 +23,7 @@ var (
 	query     = app.Command("query", "Query transactions")
 	queryName = query.Flag("name", "Name or partial name of transaction").String()
 	queryExpr = query.Flag("expr", "Regex to match against transaction").String()
+	queryCat  = query.Flag("cat", "transactions with matching category").String()
 
 	raw = app.Command("raw", "Pull raw data from bank accounts")
 
@@ -48,6 +53,7 @@ func main() {
 		txs, err = QueryTable(Query{
 			Name: *queryName,
 			Expr: *queryExpr,
+			Cat:  *queryCat,
 		})
 
 	case assign.FullCommand():

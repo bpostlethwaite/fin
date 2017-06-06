@@ -87,7 +87,7 @@ func Categorize(q Query) error {
 		return err
 	}
 
-	cat, err := GetCategory(q.Cat, cats)
+	cat, err := GetCategory(q.Cat, catsFromTable(cats))
 	if err != nil {
 		return err
 	}
@@ -98,4 +98,33 @@ func Categorize(q Query) error {
 
 	txs = AppendDedupeSort(txs, ftxs)
 	return store.WriteTransactionTable(txs)
+}
+
+func Recommend() error {
+	store := NewStore(ConfigData().SheetId)
+	txs, err := store.ReadTransactionTable()
+	if err != nil {
+		return err
+	}
+
+	cats, err := store.ReadCategoryTable()
+	if err != nil {
+		return err
+	}
+
+	ftxs, err := GooglePlaces(txs, cats)
+	if err != nil {
+		return err
+	}
+
+	txs = AppendDedupeSort(txs, ftxs)
+	return store.WriteTransactionTable(txs)
+}
+
+func catsFromTable(rows [][]string) []string {
+	cats := make([]string, len(rows))
+	for i, r := range rows {
+		cats[i] = r[0]
+	}
+	return cats
 }

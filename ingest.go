@@ -116,6 +116,12 @@ func Ingest() error {
 	// Filtering takes the more "recent" matching record.
 	txs = AppendDedupeSort(rawtxs, txs)
 
+	for i, _ := range txs {
+		if txs[i].Category == "" {
+			txs[i].Category = UNCATEGORIZED
+		}
+	}
+
 	// write back to sheet
 	return store.WriteTransactionTable(txs)
 }

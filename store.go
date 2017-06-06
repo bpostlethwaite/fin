@@ -89,16 +89,16 @@ func (s *Store) ClearSheet(clearRange string) error {
 	return err
 }
 
-func (s *Store) ReadCategoryTable() ([]string, error) {
+func (s *Store) ReadCategoryTable() ([][]string, error) {
 
 	vals, err := s.ReadSheet(CAT_TABLE)
 	if err != nil {
 		return nil, err
 	}
 
-	cats := make([]string, len(vals))
+	cats := make([][]string, len(vals))
 	for i, row := range vals {
-		cats[i] = row[0]
+		cats[i] = row
 	}
 
 	return cats, nil

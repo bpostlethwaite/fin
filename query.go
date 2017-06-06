@@ -38,6 +38,11 @@ func QueryTxs(q Query, txs []Record) ([]Record, error) {
 		return filter(txs, func(t Record, i int) bool {
 			return re.MatchString(t.Name)
 		}), nil
+	} else if q.Cat != "" {
+		cat := strings.ToUpper(q.Cat)
+		return filter(txs, func(t Record, i int) bool {
+			return strings.ToUpper(t.Category) == cat
+		}), nil
 	}
 
 	return nil, fmt.Errorf("no Query flags provided. Try `fin help query`")
