@@ -1,4 +1,4 @@
-package finpony
+package main
 
 import (
 	"context"
@@ -14,10 +14,10 @@ func queryUrl(query string) string {
 		TEXT_URL, query, ConfigCreds().GoogleMapsApiKey)
 }
 
-func PlaceTypes(query string) ([][]string, error) {
+func PlaceTypes(query string) (string, error) {
 	c, err := maps.NewClient(maps.WithAPIKey(ConfigCreds().GoogleMapsApiKey))
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	tSearch := maps.TextSearchRequest{
@@ -25,13 +25,15 @@ func PlaceTypes(query string) ([][]string, error) {
 	}
 	resp, err := c.TextSearch(context.Background(), &tSearch)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	cats := [][]string{}
-	for _, r := range resp.Results {
-		cats = append(cats, r.Types)
+	var category string
+	if len(resp.Results) > 0 {
+		if len(resp.Results[0].Types) > 0 {
+			category = resp.Results[0].Types[0]
+		}
 	}
 
-	return cats, nil
+	return category, nil
 }

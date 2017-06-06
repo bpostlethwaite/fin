@@ -1,4 +1,4 @@
-package finpony
+package main
 
 import (
 	"encoding/json"

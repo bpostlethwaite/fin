@@ -1,7 +1,9 @@
-package finpony
+package main
 
 import (
+	"crypto/md5"
 	"fmt"
+	"io"
 	"strconv"
 	"time"
 )
@@ -46,8 +48,9 @@ func (r Record) Key() string {
 	date := r.Date.Format(DATE_FORMAT)
 	name := r.Name
 	amount := strconv.FormatFloat(r.Dollar, 'f', -1, 64)
-
-	return fmt.Sprintf("%s+%s+%s", date, name, amount)
+	h := md5.New()
+	io.WriteString(h, fmt.Sprintf("%s+%s+%s", date, name, amount))
+	return string(h.Sum(nil))
 }
 
 func (r Record) Row() []interface{} {

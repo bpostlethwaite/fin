@@ -1,15 +1,9 @@
-package finpony
+package main
 
 import (
 	"log"
-	"path"
-	"runtime"
 
 	"github.com/BurntSushi/toml"
-)
-
-const (
-	CONFIG_FILE = "config.toml"
 )
 
 type finponyConf struct {
@@ -30,12 +24,7 @@ type credInfo struct {
 
 func GetConfig() (*finponyConf, error) {
 
-	_, filename, _, ok := runtime.Caller(0)
-	if !ok {
-		panic("No caller information")
-	}
-	configDir := path.Dir(filename)
-	configPath := path.Join(configDir, CONFIG_FILE)
+	configPath := *CONFIG_FILE
 
 	config := &finponyConf{}
 	if _, err := toml.DecodeFile(configPath, config); err != nil {
