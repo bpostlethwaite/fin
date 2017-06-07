@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
+	"encoding/csv"
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -44,6 +47,16 @@ func (ri RowIndicies) RecordFromRow(row []string) (Record, error) {
 	}, nil
 }
 
+func DefaultRowIndicies() RowIndicies {
+	return RowIndicies{
+		Date:       0,
+		Name:       1,
+		Dollar:     2,
+		Category:   3,
+		DateFormat: DATE_FORMAT,
+	}
+}
+
 type Record struct {
 	Date     time.Time
 	Name     string
@@ -52,26 +65,28 @@ type Record struct {
 }
 
 func (r Record) String() string {
-	s := fmt.Sprintf("%s \"%s\" %s",
-		r.Date.Format(DATE_FORMAT),
-		r.Name,
-		strconv.FormatFloat(r.Dollar, 'f', -1, 64))
-
-	if r.Category == "" {
-		return s
-	}
-
-	return fmt.Sprintf("%s %s", s, r.Category)
+	buf := new(bytes.Buffer)
+	w := csv.NewWriter(buf)
+	w.Write(r.Row())
+	w.Flush()
+	return strings.TrimSpace(buf.String())
 }
 
 func (r Record) Key() string {
-	date := r.Date.Format(DATE_FORMAT)
-	name := r.Name
-	amount := strconv.FormatFloat(r.Dollar, 'f', -1, 64)
-	return fmt.Sprintf("%s+%s+%s", date, name, amount)
+	row := r.Row()
+	return fmt.Sprintf("%s+%s+%s", row[0], row[1], row[2])
 }
 
-func (r Record) Row() []interface{} {
+func (r Record) Row() []string {
+	return []string{
+		r.Date.Format(DATE_FORMAT),
+		r.Name,
+		strconv.FormatFloat(r.Dollar, 'f', -1, 64),
+		r.Category,
+	}
+}
+
+func (r Record) RowInterface() []interface{} {
 	return []interface{}{
 		r.Date.Format(DATE_FORMAT),
 		r.Name,
@@ -102,10 +117,10 @@ func (a ByDate) Less(i, j int) bool {
 
 type To []Record
 
-func (rs To) Rows() [][]interface{} {
+func (rs To) RowsInterface() [][]interface{} {
 	rows := make([][]interface{}, len(rs))
 	for i, r := range rs {
-		rows[i] = r.Row()
+		rows[i] = r.RowInterface()
 	}
 
 	return rows

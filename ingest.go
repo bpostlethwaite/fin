@@ -12,7 +12,7 @@ func readRawTx() ([]Record, error) {
 	records := []Record{}
 	files, err := ioutil.ReadDir(ConfigData().Raw)
 	if err != nil {
-		return []Record{}, err
+		return nil, err
 	}
 
 	rowTemplates := []RowIndicies{
@@ -27,68 +27,90 @@ func readRawTx() ([]Record, error) {
 
 	for _, file := range files {
 		fpath := path.Join(ConfigData().Raw, file.Name())
-		f, err := os.OpenFile(fpath, os.O_RDWR|os.O_CREATE, os.ModePerm)
+		txs, err := ReadFromFile(fpath, rowTemplates)
 		if err != nil {
-			return []Record{}, err
-		}
-		defer f.Close()
-
-		r := csv.NewReader(f)
-		r.TrimLeadingSpace = true
-		r.FieldsPerRecord = -1
-
-		rows, err := r.ReadAll()
-		if err != nil {
-			return []Record{}, err
+			return nil, err
 		}
 
-		// TODO header detection. Strip header
-		rows = rows[1:]
-
-		var rerr error
-	NextTemplate:
-		for _, ri := range rowTemplates {
-			recs := []Record{}
-			for _, row := range rows {
-				rec, err := ri.RecordFromRow(row)
-				if err != nil {
-					rerr = err
-					continue NextTemplate
-				}
-				recs = append(recs, rec)
-			}
-			records = append(records, recs...)
-			break
-		}
-
-		if len(records) == 0 {
-			return []Record{}, rerr
-		}
+		records = append(records, txs...)
 	}
 
 	return records, nil
 }
 
-func toUpper(recs []Record) []Record {
-	frecs := []Record{}
+func ReadFromFile(fpath string, tmpls []RowIndicies) ([]Record, error) {
+	f, err := os.OpenFile(fpath, os.O_RDONLY, os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
 
-	for _, r := range recs {
-		r.Name = strings.ToUpper(r.Name)
-		frecs = append(frecs, r)
+	r := csv.NewReader(f)
+	r.TrimLeadingSpace = true
+	r.FieldsPerRecord = -1
+
+	rows, err := r.ReadAll()
+	if err != nil {
+		return nil, err
 	}
 
-	return frecs
+	txs := []Record{}
+	rlen := len(rows)
+	var rerr error
+NextTemplate:
+	for _, ri := range tmpls {
+		recs := []Record{}
+		for i, row := range rows {
+			rec, err := ri.RecordFromRow(row)
+			skipErr := rlen > 1 && i == 0
+			if err != nil {
+				if skipErr {
+					continue
+				}
+				rerr = err
+				continue NextTemplate
+			}
+
+			recs = append(recs, rec)
+		}
+		txs = append(txs, recs...)
+		break
+	}
+
+	if len(txs) == 0 {
+		return nil, rerr
+	}
+
+	return txs, nil
 }
 
-func unEscape(recs []Record) []Record {
-	frecs := []Record{}
-	replacer := strings.NewReplacer("&amp;", "&")
-	for _, r := range recs {
-		r.Name = replacer.Replace(r.Name)
-		frecs = append(frecs, r)
+func IngestFile(fpath string) error {
+	newtxs, err := ReadFromFile(fpath, []RowIndicies{DefaultRowIndicies()})
+	if err != nil {
+		return err
 	}
 
-	return frecs
+	newtxs = unEscape(newtxs)
+	newtxs = toUpper(newtxs)
+
+	store := NewStore(ConfigData().SheetId)
+
+	txs, err := store.ReadTransactionTable()
+	if err != nil {
+		return err
+	}
+
+	// newtxs come after as we are overwriting matching txs
+	txs = AppendDedupeSort(txs, newtxs)
+
+	for i, _ := range txs {
+		if txs[i].Category == "" {
+			txs[i].Category = UNCATEGORIZED
+		}
+	}
+
+	// write back to sheet
+	return store.WriteTransactionTable(txs)
 }
 
 func Ingest() error {
@@ -124,4 +146,26 @@ func Ingest() error {
 
 	// write back to sheet
 	return store.WriteTransactionTable(txs)
+}
+
+func toUpper(recs []Record) []Record {
+	frecs := []Record{}
+
+	for _, r := range recs {
+		r.Name = strings.ToUpper(r.Name)
+		frecs = append(frecs, r)
+	}
+
+	return frecs
+}
+
+func unEscape(recs []Record) []Record {
+	frecs := []Record{}
+	replacer := strings.NewReplacer("&amp;", "&")
+	for _, r := range recs {
+		r.Name = replacer.Replace(r.Name)
+		frecs = append(frecs, r)
+	}
+
+	return frecs
 }

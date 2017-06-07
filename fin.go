@@ -20,19 +20,21 @@ var (
 	DEBUG       = app.Flag("debug", "Enable debug mode").Bool()
 	CONFIG_FILE = app.Flag("config", "Config file path").Default(DEFAULT_CONFIG).String()
 
-	query     = app.Command("query", "Query transactions")
-	queryName = query.Flag("name", "Name or partial name of transaction").String()
-	queryExpr = query.Flag("expr", "Regex to match against transaction").String()
-	queryCat  = query.Flag("cat", "transactions with matching category").String()
+	query       = app.Command("query", "Query transactions")
+	queryName   = query.Flag("name", "Name or partial name of transaction").String()
+	queryExpr   = query.Flag("expr", "Regex to match against transaction").String()
+	queryCat    = query.Flag("cat", "transactions with matching category").String()
+	querySearch = query.Flag("search", "recommend categories for transactions").Bool()
 
 	raw = app.Command("raw", "Pull raw data from bank accounts")
 
 	ingest = app.Command("ingest", "Ingest raw tx data into the system")
 
 	apply     = app.Command("apply", "Apply categories to transactions ")
+	applyFile = apply.Flag("file", "apply transactions from file. Useful for applying recommendations").String()
 	applyName = apply.Flag("name", "Name or partial name of transaction").String()
 	applyExpr = apply.Flag("expr", "Regex to match against transaction").String()
-	applyCat  = apply.Arg("category", "Name of category").Required().String()
+	applyCat  = apply.Arg("category", "Name of category").String()
 )
 
 func main() {
@@ -50,18 +52,26 @@ func main() {
 		err = Ingest()
 
 	case query.FullCommand():
-		txs, err = QueryTable(Query{
-			Name: *queryName,
-			Expr: *queryExpr,
-			Cat:  *queryCat,
-		})
+		if *querySearch {
+			txs, err = Recommend()
+		} else {
+			txs, err = QueryTable(Query{
+				Name: *queryName,
+				Expr: *queryExpr,
+				Cat:  *queryCat,
+			})
+		}
 
 	case apply.FullCommand():
-		err = Categorize(Query{
-			Name: *applyName,
-			Expr: *applyExpr,
-			Cat:  *applyCat,
-		})
+		if *applyFile != "" {
+			err = IngestFile(*applyFile)
+		} else {
+			err = Categorize(Query{
+				Name: *applyName,
+				Expr: *applyExpr,
+				Cat:  *applyCat,
+			})
+		}
 	}
 
 	if err != nil {

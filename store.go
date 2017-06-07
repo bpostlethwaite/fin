@@ -59,13 +59,7 @@ func (s *Store) ReadTransactionTable() ([]Record, error) {
 		return nil, err
 	}
 
-	ri := RowIndicies{
-		Date:       0,
-		Name:       1,
-		Dollar:     2,
-		Category:   3,
-		DateFormat: DATE_FORMAT,
-	}
+	ri := DefaultRowIndicies()
 
 	txs := []Record{}
 	for _, row := range vals {
@@ -80,7 +74,7 @@ func (s *Store) ReadTransactionTable() ([]Record, error) {
 }
 
 func (s *Store) WriteTransactionTable(txs []Record) error {
-	return s.WriteSheet(TX_TABLE, To(txs).Rows())
+	return s.WriteSheet(TX_TABLE, To(txs).RowsInterface())
 }
 
 func (s *Store) ClearSheet(clearRange string) error {

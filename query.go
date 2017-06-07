@@ -49,7 +49,6 @@ func QueryTxs(q Query, txs []Record) ([]Record, error) {
 }
 
 func QueryTable(q Query) ([]Record, error) {
-
 	store := NewStore(ConfigData().SheetId)
 	txs, err := store.ReadTransactionTable()
 	if err != nil {
