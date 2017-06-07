@@ -7,9 +7,10 @@ import (
 )
 
 type finponyConf struct {
-	Project string
-	Data    dataInfo
-	Creds   credInfo
+	Project     string
+	ProjectPath string `toml:"project_path"`
+	Data        dataInfo
+	Creds       credInfo
 }
 
 type dataInfo struct {

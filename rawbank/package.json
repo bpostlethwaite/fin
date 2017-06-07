@@ -1,17 +1,13 @@
 {
-  "name": "finscrape",
+  "name": "rawbank",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
   "dependencies": {
     "chromedriver": "^2.29.0",
     "nightwatch": "^0.9.15",
     "toml": "^2.3.2"
   },
-  "devDependencies": {},
   "scripts": {
     "start": "nightwatch"
   },
-  "author": "",
-  "license": "ISC"
+  "license": "GPL"
 }

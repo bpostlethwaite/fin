@@ -29,10 +29,10 @@ var (
 
 	ingest = app.Command("ingest", "Ingest raw tx data into the system")
 
-	assign     = app.Command("assign", "Assign categories to transactions ")
-	assignName = assign.Flag("name", "Name or partial name of transaction").String()
-	assignExpr = assign.Flag("expr", "Regex to match against transaction").String()
-	assignCat  = assign.Arg("category", "Name of category").Required().String()
+	apply     = app.Command("apply", "Apply categories to transactions ")
+	applyName = apply.Flag("name", "Name or partial name of transaction").String()
+	applyExpr = apply.Flag("expr", "Regex to match against transaction").String()
+	applyCat  = apply.Arg("category", "Name of category").Required().String()
 )
 
 func main() {
@@ -44,7 +44,7 @@ func main() {
 	switch cmd {
 
 	case raw.FullCommand():
-		err = fmt.Errorf("%s not implemented", cmd)
+		err = RawBank()
 
 	case ingest.FullCommand():
 		err = Ingest()
@@ -56,11 +56,11 @@ func main() {
 			Cat:  *queryCat,
 		})
 
-	case assign.FullCommand():
+	case apply.FullCommand():
 		err = Categorize(Query{
-			Name: *assignName,
-			Expr: *assignExpr,
-			Cat:  *assignCat,
+			Name: *applyName,
+			Expr: *applyExpr,
+			Cat:  *applyCat,
 		})
 	}
 
