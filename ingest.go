@@ -23,6 +23,9 @@ func readRawTx() ([]Record, error) {
 			Dollar:     6,
 			DateFormat: "1/2/2006",
 		},
+
+		// App format
+		DefaultRowIndicies(),
 	}
 
 	for _, file := range files {

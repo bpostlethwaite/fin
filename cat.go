@@ -17,41 +17,33 @@ const (
 	COMPARE_CHARS = 15
 )
 
-var (
-	withAddr   *regexp.Regexp = regexp.MustCompile("(.*)\\s+(#.*)")
-	withDigits *regexp.Regexp = regexp.MustCompile("(.*)\\s+([0-9]+(-?[0-9]+)+\\s+.*)")
-	cities     [10]string     = [10]string{
-		"MONTREAL", "MAGOG", "VANCOUVER", "TORONTO", "BOLTON", "CALGARY",
-		"MISSISSAUGA", "CANMORE", "OUTREMONT", "CHAMBLY",
-	}
-)
-
 type Match struct {
-	Name string
-	Desc string
-	dist int
+	Name      string
+	PlaceType string
+	Category  string
+	Record    Record
+	dist      int
 }
 
-func extractName(n string) *Match {
-	matches := withAddr.FindStringSubmatch(n)
-	if len(matches) > 2 {
-		return &Match{Name: matches[1], Desc: matches[2]}
+func (m Match) String() string {
+	s := []string{}
+	if m.Name != "" {
+		s = append(s, fmt.Sprintf("Name: %s", m.Name))
 	}
 
-	matches = withDigits.FindStringSubmatch(n)
-	if len(matches) > 2 {
-		return &Match{Name: matches[1], Desc: matches[2]}
+	if m.PlaceType != "" {
+		s = append(s, fmt.Sprintf("Place: %s", m.PlaceType))
 	}
 
-	for _, c := range cities {
-		withCity := regexp.MustCompile(fmt.Sprintf("(.*)\\s+(%s.*)", c))
-		matches := withCity.FindStringSubmatch(n)
-		if len(matches) > 2 {
-			return &Match{Name: matches[1], Desc: matches[2]}
-		}
+	if m.Category != "" {
+		s = append(s, fmt.Sprintf("Place: %s", m.Category))
 	}
 
-	return nil
+	if m.Record != (Record{}) {
+		s = append(s, fmt.Sprintf("Record: %s", m.Record))
+	}
+
+	return strings.Join(s, " ")
 }
 
 func GetCategory(cat string, cats []string) (string, error) {
@@ -95,6 +87,10 @@ func Categorize(q Query) error {
 		return err
 	}
 
+	if len(cats) == 0 {
+		return fmt.Errorf("Category Sheet is empty.")
+	}
+
 	cat, err := GetCategory(q.Cat, catsFromTable(cats))
 	if err != nil {
 		return err
@@ -108,7 +104,7 @@ func Categorize(q Query) error {
 	return store.WriteTransactionTable(txs)
 }
 
-func Recommend() ([]Record, error) {
+func CatSearch() ([]Record, error) {
 	store := NewStore(ConfigData().SheetId)
 	txs, err := store.ReadTransactionTable()
 	if err != nil {
@@ -122,17 +118,54 @@ func Recommend() ([]Record, error) {
 
 	// First see if there are any recommendations we can make based on
 	// internal consistencies.
-	ftxs := InternalSearch(txs)
+	internalTxs := InternalSearch(txs)
 
 	// Now check Google places to see if there any other recommendations.
 	// Pass in all txs updated with Internal search.
-	nftxs, err := GooglePlaces(AppendDedupeSort(txs, ftxs), cats)
+	matches, err := GooglePlaces(AppendDedupeSort(txs, internalTxs), cats)
 	if err != nil {
 		return nil, err
 	}
 
+	placeTxs := []Record{}
+	for _, m := range matches {
+		if m.Category != "" {
+			m.Record.Category = m.Category
+			placeTxs = append(placeTxs, m.Record)
+		}
+	}
+
 	// return only updated transactions
-	return append(ftxs, nftxs...), nil
+	return append(internalTxs, placeTxs...), nil
+}
+
+func UnmatchedPlaceSearch() ([]Match, error) {
+	store := NewStore(ConfigData().SheetId)
+	txs, err := store.ReadTransactionTable()
+	if err != nil {
+		return nil, err
+	}
+
+	cats, err := store.ReadCategoryTable()
+	if err != nil {
+		return nil, err
+	}
+
+	// Now check Google places to see if there any other recommendations.
+	// Pass in all txs updated with Internal search.
+	matches, err := GooglePlaces(txs, cats)
+	if err != nil {
+		return nil, err
+	}
+
+	unmatched := []Match{}
+	for _, m := range matches {
+		if m.Category == "" {
+			unmatched = append(unmatched, m)
+		}
+	}
+
+	return unmatched, nil
 }
 
 func InternalSearch(txs []Record) []Record {
@@ -204,15 +237,16 @@ func PlaceType(query string) (string, error) {
 
 var replDigits *regexp.Regexp = regexp.MustCompile("(.*\\s+)([0-9]+(-?[0-9]+)+)(\\s+.*)")
 
-func GooglePlaces(txs []Record, cats [][]string) ([]Record, error) {
+func GooglePlaces(txs []Record, cats [][]string) ([]Match, error) {
 
-	recs := []Record{}
-	// remove weird digits and whatnot
-	for i, _ := range txs {
-		if txs[i].Category != UNCATEGORIZED {
+	matches := []Match{}
+	for _, tx := range txs {
+		if tx.Category != UNCATEGORIZED {
 			continue
 		}
-		subName := replDigits.ReplaceAllString(txs[i].Name, "$1$4")
+
+		// remove weird digits and whatnot
+		subName := replDigits.ReplaceAllString(tx.Name, "$1$4")
 		gcat, err := PlaceType(subName)
 		if err != nil {
 			if strings.Contains(err.Error(), "ZERO_RESULTS") {
@@ -222,13 +256,15 @@ func GooglePlaces(txs []Record, cats [][]string) ([]Record, error) {
 		}
 
 		cat := getCategoryFromRelated(gcat, cats)
-		if cat != "" {
-			txs[i].Category = cat
-			recs = append(recs, txs[i])
-		}
+		matches = append(matches, Match{
+			Name:      subName,
+			PlaceType: gcat,
+			Category:  cat,
+			Record:    tx,
+		})
 	}
 
-	return recs, nil
+	return matches, nil
 }
 
 func getCategoryFromRelated(rel string, cats [][]string) string {

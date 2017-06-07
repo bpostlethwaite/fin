@@ -81,7 +81,7 @@ func (r Record) Row() []string {
 	return []string{
 		r.Date.Format(DATE_FORMAT),
 		r.Name,
-		strconv.FormatFloat(r.Dollar, 'f', -1, 64),
+		strconv.FormatFloat(r.Dollar, 'f', 2, 64),
 		r.Category,
 	}
 }
