@@ -1,0 +1,16 @@
+{{define "catpie"}}
+{
+  "data": [
+    {
+      "values": {{ .Values }},
+      "showlegend": false,
+      "labels": {{ .Labels }},
+      "type": "pie",
+      "hole": 0.2
+    }
+  ],
+  "layout": {
+    "title": "{{ .Title }}"
+  }
+}
+{{end}}

@@ -1,0 +1,30 @@
+{{define "base"}}
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta http-equiv="Content-Language" content="en">
+    <meta name="viewport" content="width=device-width">
+
+    <title>{{ .Title }}</title>
+  </head>
+  <body>
+    <script
+        type="text/javascript"
+        src="https://cdn.plot.ly/plotly-basic-latest.min.js">
+    </script>
+    <div id="plot"></div>
+    <script>
+      function clone(data) {
+          return JSON.parse(JSON.stringify(data));
+      }
+
+      {{template "data" .Data}}
+
+       var figure = {{template "catpie" .Pie}}
+
+      Plotly.plot("plot", figure);
+    </script>
+  </body>
+</html>
+{{end}}

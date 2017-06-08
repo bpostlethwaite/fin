@@ -1,0 +1,5 @@
+{{define "data"}}
+{{ .Ref }} = {};
+{{ .Categories.Ref }} = clone({{ .Categories.Val }});
+{{ .Dollars.Ref }} = clone({{ .Dollars.Val }});
+{{end}}

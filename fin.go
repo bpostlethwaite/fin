@@ -36,7 +36,9 @@ var (
 	applyExpr = apply.Flag("expr", "Regex to match against transaction.").String()
 	applyCat  = apply.Arg("category", "Name of category.").String()
 
-	clear      = app.Command("clear", "Clears the transaction table. Doesn't actually work without force flag.")
+	report = app.Command("report", "Generate reports")
+
+	clear      = app.Command("clear", "Clears a sheet. Designed for testing.")
 	clearSheet = clear.Arg("sheet", "Name of sheet to clear.").String()
 )
 
@@ -77,6 +79,9 @@ func main() {
 				Cat:  *applyCat,
 			})
 		}
+
+	case report.FullCommand():
+		err = GenerateReports()
 
 	case clear.FullCommand():
 		store := NewStore(ConfigData().SheetId)

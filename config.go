@@ -15,6 +15,7 @@ type finponyConf struct {
 
 type dataInfo struct {
 	Raw     string `toml:"raw_data"`
+	Reports string `toml:"reports"`
 	SheetId string `toml:"sheet_id"`
 }
 
