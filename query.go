@@ -12,7 +12,9 @@ type Query struct {
 	Cat  string
 }
 
-func filter(txs []Record, f func(Record, int) bool) []Record {
+type Filter func(Record, int) bool
+
+func filter(txs []Record, f Filter) []Record {
 	ftxs := []Record{}
 	for i, tx := range txs {
 		if f(tx, i) {

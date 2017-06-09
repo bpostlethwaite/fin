@@ -2,15 +2,17 @@
 {
   "data": [
     {
-      "values": {{ .Values }},
-      "showlegend": false,
-      "labels": {{ .Labels }},
       "type": "pie",
-      "hole": 0.2
+      "values": {{.Values}},
+      "labels": {{.Labels}},
+      "marker": {
+        "colors": {{.Colors}}
+      },
+      "showlegend": false
     }
   ],
   "layout": {
-    "title": "{{ .Title }}"
+    "title": "Aggregated Categories for {{.Month}}"
   }
 }
 {{end}}

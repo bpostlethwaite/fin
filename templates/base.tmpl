@@ -5,26 +5,197 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <meta http-equiv="Content-Language" content="en">
     <meta name="viewport" content="width=device-width">
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <title>{{ .Title }}</title>
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link
+        rel="icon"
+        href="https://cdn0.iconfinder.com/data/icons/shark/154/shark-fin-wave-sea-256.png">
+
+    <link
+        rel="stylesheet"
+        href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.min.css"
+        integrity="sha384-rwoIResjU2yc3z8GV/NPeZWAv56rSmLldC3R/AZzGRnGxQQKnKkoFVhFQhNUwEyJ"
+        crossorigin="anonymous">
+
+    <!-- Custom styles for this template -->
+    <link href="dashboard.css" rel="stylesheet">
+
+    <style>
+     .hidden-dash{
+         display: none;
+     }
+     {{with .Data}}
+     {{range .Months}}
+     #table-{{.Month}}:target.hidden-dash{
+         display: block;
+     }
+     {{end}}
+     {{end}}
+    </style>
+
+    <title>{{.Title}}</title>
   </head>
   <body>
+    <nav class="navbar navbar-toggleable-md navbar-inverse bg-inverse">
+      <button class="navbar-toggler navbar-toggler-right" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <a class="navbar-brand" href="#">{{.Title}}</a>
+
+      <div class="collapse navbar-collapse" id="navbarSupportedContent">
+        <ul class="navbar-nav mr-auto">
+          <li class="nav-item active">
+            <a class="nav-link" href="#">Home <span class="sr-only">(current)</span></a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#">Link</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link disabled" href="#">Disabled</a>
+          </li>
+        </ul>
+        <form class="form-inline my-2 my-lg-0">
+          <input class="form-control mr-sm-2" type="text" placeholder="Search">
+          <button class="btn btn-outline-success my-2 my-sm-0" type="submit">Search</button>
+        </form>
+      </div>
+    </nav>
+
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col-md-2">
+          <ul class="nav flex-column">
+            <li class="nav-item">
+              <a class="nav-link"
+                 href="#table-{{.Data.RecentMonth}}">
+                Monthly Reports
+              </a>
+              <nav class="nav flex-column" style="margin-left: 30px;">
+                {{with .Data}}{{range .Months}}
+                <a class="nav-link max-active"
+                   href="#table-{{.Month}}">{{.Month}}</a>
+                {{end}}{{end}}
+              </nav>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#">History</a>
+            </li>
+          </ul>
+        </div>
+
+        <div class="col-md-10">
+          {{with .Data}}
+          {{range .Months}}
+          <div class="hidden-dash" id="table-{{.Month}}">
+
+            <h1 class="page-header">{{.Month}} Data</h1>
+
+            <div class="row">
+              <div class="col-md-6">
+                <div id="plot-{{.Month}}"></div>
+              </div>
+              <div class="col-md-6">
+
+                <h2 class="sub-header">Total Category Spending</h2>
+                <div class="table-responsive">
+                  <table class="table">
+                    <thead>
+                      <tr>
+                        <th>Amount</th>
+                        <th>Category</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {{range .ToPairs}}
+                      <tr>
+                        <td>{{.Value | printf "$%.2f"}}</td>
+                        <td>{{.Label}}</td>
+                      </tr>
+                      {{end}}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+          {{end}}
+          {{end}}
+        </div>
+      </div>
+    </div>
     <script
         type="text/javascript"
         src="https://cdn.plot.ly/plotly-basic-latest.min.js">
     </script>
-    <div id="plot"></div>
+
     <script>
-      function clone(data) {
-          return JSON.parse(JSON.stringify(data));
-      }
+     {{with .Data}}
+     {{.DataVar}} = {
+         {{range .Months}}
+         {{.Month}}: {
+             labels: {{.Labels}},
+             values: {{.Values}},
+             colors: {{.Colors}}
+         },
+         {{end}}
+     };
 
-      {{template "data" .Data}}
+     {{range .Months}}
+     Plotly.newPlot('plot-{{.Month}}', {{template "catpie" .ToRefs}});
+     {{end}}
+     {{end}}
 
-       var figure = {{template "catpie" .Pie}}
-
-      Plotly.plot("plot", figure);
+     window.onresize = function() {
+         {{with .Data}}{{range .Months}}
+         if ($('#plot-{{.Month}}').is(':visible')) {
+             Plotly.Plots.resize($('#plot-{{.Month}}')[0]);
+         }
+         {{end}}{{end}}
+     };
     </script>
+
+    <script
+        src="https://code.jquery.com/jquery-3.1.1.slim.min.js"
+        integrity="sha384-A7FZj7v+d/sdmMqp/nOQwliLvUsJfDHW+k9Omg/a/EheAdgtzNs3hpfag6Ed950n"
+        crossorigin="anonymous">
+
+    </script>
+    <script
+        src="https://cdnjs.cloudflare.com/ajax/libs/tether/1.4.0/js/tether.min.js"
+        integrity="sha384-DztdAPBWPRXSA/3eYEEUWrWCy7G5KFbe8fFjk5JAIxUYHKkDx6Qin1DkWx51bBrb"
+        crossorigin="anonymous">
+
+    </script>
+    <script
+        src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/js/bootstrap.min.js"
+        integrity="sha384-vBWWzlZJ8ea9aCX4pEW3rVHjgjt7zpkNpZk+02D9phzyeVkE+jo0ieGizqPLForn"
+        crossorigin="anonymous">
+    </script>
+
+    <script>
+     var maxactive = 'active bg-primary text-white';
+     var activateHref = function(e) {
+         var url = window.location.href;
+         $('.nav a').each(function() {
+             if (this.href === url) {
+                 if ($(this).hasClass('max-active')) {
+                     $(this).addClass(maxactive);
+                 } else {
+                     $(this).addClass('active');
+                 }
+             } else {
+                 $(this).removeClass(maxactive);
+             }
+         });
+     };
+     $(window).on('hashchange', activateHref)
+     activateHref();
+    </script>
+
   </body>
 </html>
 {{end}}
