@@ -1,0 +1,26 @@
+{{define "aggcat"}}
+<table class="table">
+  <thead>
+    <tr>
+      {{if (len .Colors) gt 0}}
+      <th>Color</th>
+      {{end}}
+      <th>Amount</th>
+      <th>Category</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .ToPairs}}
+    <tr>
+      {{if (len .Color) gt 0}}
+      <td>
+        <div style="background:{{.Color}};width:20%;padding-top:20%;"></div>
+      </td>
+      {{end}}
+      <td>{{.Value | printf "$%.2f"}}</td>
+      <td>{{.Label}}</td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{end}}

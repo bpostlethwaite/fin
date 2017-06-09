@@ -1,0 +1,30 @@
+{{define "scatxs"}}
+{
+  "data": [
+    {{range .CatTxs}}
+    {
+      "type": "scatter",
+      "mode": "markers",
+      "name": "{{.Category}}",
+      "text": [{{range $i, $tx := .Txs}}{{if $i}},{{end}}"{{$tx.Name}}"{{end}}],
+      "x": [{{range $i, $tx := .Txs}}{{if $i}},{{end}}"{{$tx.DateString}}"{{end}}],
+      "y": [{{range $i, $tx := .Txs}}{{if $i}},{{end}}{{abs $tx.Dollar}}{{end}}],
+      "marker": {
+        "color": "{{.Color}}"
+      },
+      "showlegend": true
+    },
+    {{end}}
+  ],
+  "layout": {
+    "title": "{{.Month}} Transactions",
+    "yaxis": {
+      "title": "Amount",
+      "tickprefix": "$"
+    },
+    "xaxis": {
+      "title": "Date"
+    }
+  }
+}
+{{end}}

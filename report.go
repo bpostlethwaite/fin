@@ -1,17 +1,12 @@
 package main
 
 import (
-	"fmt"
 	"html/template"
 	"math"
 	"os"
 	"path/filepath"
 	"sort"
 	"time"
-)
-
-const (
-	DATAVAR = "window.FinData"
 )
 
 type BasePage struct {
@@ -22,12 +17,15 @@ type BasePage struct {
 type Data struct {
 	DataVar     template.JS
 	Months      []AggCat
+	All         AggCat
 	RecentMonth template.JS
 }
 
 type AggCat struct {
 	month  time.Month
 	Month  template.JS
+	Txs    []Record
+	CatTxs []CatTx
 	Labels []string
 	Values []float64
 	Colors []string
@@ -36,37 +34,54 @@ type AggCat struct {
 type AggPair struct {
 	Label string
 	Value float64
-}
-
-type AggCatRef struct {
-	Month  template.JS
-	Labels template.JS
-	Values template.JS
-	Colors template.JS
+	Color string
 }
 
 func (ac AggCat) ToPairs() []AggPair {
 	ap := []AggPair{}
 	for i := 0; i < len(ac.Labels); i++ {
-		ap = append(ap, AggPair{ac.Labels[i], ac.Values[i]})
+		c := ""
+		if len(ac.Colors) > i {
+			c = ac.Colors[i]
+		}
+		ap = append(ap, AggPair{ac.Labels[i], ac.Values[i], c})
 	}
 
 	return ap
 }
 
-func (ac AggCat) ToRefs() AggCatRef {
-	return AggCatRef{
-		Month:  template.JS(ac.Month),
-		Labels: template.JS(fmt.Sprintf("%s.%s.labels", DATAVAR, ac.Month)),
-		Values: template.JS(fmt.Sprintf("%s.%s.values", DATAVAR, ac.Month)),
-		Colors: template.JS(fmt.Sprintf("%s.%s.colors", DATAVAR, ac.Month)),
+type CatTx struct {
+	Category template.JS
+	Color    template.JS
+	Txs      []Record
+}
+
+func txsByCat(txs []Record, cmap map[string]string) []CatTx {
+	cts := []CatTx{}
+	iseen := map[string]int{}
+
+	for _, tx := range txs {
+		i, ok := iseen[tx.Category]
+		if !ok {
+			c, _ := cmap[tx.Category]
+			cts = append(cts, CatTx{
+				Category: template.JS(tx.Category),
+				Color:    template.JS(c),
+				Txs:      []Record{tx},
+			})
+			iseen[tx.Category] = len(cts) - 1
+		} else {
+			cts[i].Txs = append(cts[i].Txs, tx)
+		}
 	}
+
+	return cts
 }
 
 func sortCatsValsByLabel(cats []string, vals []float64) {
 	ap := []AggPair{}
 	for i := 0; i < len(cats); i++ {
-		ap = append(ap, AggPair{cats[i], vals[i]})
+		ap = append(ap, AggPair{Label: cats[i], Value: vals[i]})
 	}
 	sort.Slice(ap, func(i, j int) bool { return ap[i].Label < ap[j].Label })
 
@@ -79,7 +94,7 @@ func sortCatsValsByLabel(cats []string, vals []float64) {
 func sortCatsValsByValue(cats []string, vals []float64) {
 	ap := []AggPair{}
 	for i := 0; i < len(cats); i++ {
-		ap = append(ap, AggPair{cats[i], vals[i]})
+		ap = append(ap, AggPair{Label: cats[i], Value: vals[i]})
 	}
 	sort.Slice(ap, func(i, j int) bool { return ap[i].Value >= ap[j].Value })
 
@@ -117,6 +132,11 @@ func groupByMonth(txs []Record) map[time.Month][]Record {
 
 func GenerateReports() error {
 
+	funcMap := template.FuncMap{
+		// The name "title" is what the function will be called in the template text.
+		"abs": math.Abs,
+	}
+
 	store := NewStore(ConfigData().SheetId)
 	txs, err := store.ReadTransactionTable()
 	if err != nil {
@@ -124,7 +144,6 @@ func GenerateReports() error {
 	}
 
 	txs = filter(txs, func(tx Record, i int) bool { return tx.Dollar <= 0. })
-	cmonths := []AggCat{}
 
 	// We want to pair a particular category with the same color month to month.
 	// To do so create a category=>color map before chopping data into months.
@@ -134,16 +153,32 @@ func GenerateReports() error {
 	for i, c := range cats {
 		cmap[c] = COLORS[i]
 	}
+	colors := values(cmap, cats)
+	all := AggCat{
+		Labels: cats,
+		Values: vals,
+		Colors: colors,
+		CatTxs: txsByCat(txs, cmap),
+		Txs:    txs,
+	}
 
+	// Monthly Data
+	cmonths := []AggCat{}
 	for k, v := range groupByMonth(txs) {
+		sort.Sort(ByDate(v))
 		cats, vals := aggregateCategoryExpenses(v)
 		sortCatsValsByValue(cats, vals)
 		colors := values(cmap, cats)
 		cmonths = append(cmonths, AggCat{
-			k, template.JS(k.String()), cats, vals, colors,
+			month:  k,
+			Month:  template.JS(k.String()),
+			Labels: cats,
+			Values: vals,
+			Colors: colors,
+			CatTxs: txsByCat(v, cmap),
+			Txs:    v,
 		})
 	}
-
 	sort.Slice(cmonths, func(i, j int) bool {
 		return cmonths[i].month < cmonths[j].month
 	})
@@ -151,14 +186,16 @@ func GenerateReports() error {
 	base := BasePage{
 		Title: Config().Project,
 		Data: Data{
-			DataVar:     template.JS(DATAVAR),
+			All:         all,
 			Months:      cmonths,
 			RecentMonth: cmonths[len(cmonths)-1].Month,
 		},
 	}
 
 	pattern := filepath.Join(Config().ProjectPath, "templates", "*.tmpl")
-	templates := template.Must(template.ParseGlob(pattern))
+	templates := template.Must(
+		template.New("cheese").Funcs(funcMap).ParseGlob(pattern),
+	)
 
 	reportPath := filepath.Join(ConfigData().Reports, "report.html")
 	f, err := os.OpenFile(reportPath, os.O_WRONLY|os.O_CREATE, 0644)

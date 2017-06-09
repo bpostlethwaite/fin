@@ -1,0 +1,22 @@
+{{define "txs"}}
+<table class="table">
+  <thead>
+    <tr>
+      <th>Date</th>
+      <th>Description</th>
+      <th>Category</th>
+      <th>Amount</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .Txs}}
+    <tr>
+      <td>{{.DateString}}</td>
+      <td>{{.Name}}</td>
+      <td>{{.DollarString}}</td>
+      <td>{{.Category}}</td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{end}}

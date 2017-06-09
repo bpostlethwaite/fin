@@ -72,6 +72,14 @@ func (r Record) String() string {
 	return strings.TrimSpace(buf.String())
 }
 
+func (r Record) DateString() string {
+	return r.Date.Format(DATE_FORMAT)
+}
+
+func (r Record) DollarString() string {
+	return strconv.FormatFloat(r.Dollar, 'f', 2, 64)
+}
+
 func (r Record) Key() string {
 	row := r.Row()
 	return fmt.Sprintf("%s+%s+%s", row[0], row[1], row[2])
@@ -79,9 +87,9 @@ func (r Record) Key() string {
 
 func (r Record) Row() []string {
 	return []string{
-		r.Date.Format(DATE_FORMAT),
+		r.DateString(),
 		r.Name,
-		strconv.FormatFloat(r.Dollar, 'f', 2, 64),
+		r.DollarString(),
 		r.Category,
 	}
 }
