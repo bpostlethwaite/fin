@@ -10,6 +10,7 @@ type Query struct {
 	Name string
 	Expr string
 	Cat  string
+	Val  string
 }
 
 type Filter func(Record, int) bool
@@ -29,9 +30,8 @@ func QueryTxs(q Query, txs []Record) ([]Record, error) {
 	if q.Name != "" {
 		name := strings.ToUpper(q.Name)
 		return filter(txs, func(t Record, i int) bool {
-			return strings.HasPrefix(t.Name, name)
+			return strings.ToUpper(t.Name) == name
 		}), nil
-
 	} else if q.Expr != "" {
 		re, err := regexp.Compile(strings.ToUpper(q.Expr))
 		if err != nil {

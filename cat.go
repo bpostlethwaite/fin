@@ -1,13 +1,9 @@
 package main
 
 import (
-	"context"
 	"fmt"
-	"regexp"
 	"sort"
 	"strings"
-
-	"googlemaps.github.io/maps"
 
 	"github.com/antzucaro/matchr"
 )
@@ -15,6 +11,10 @@ import (
 const (
 	TEXT_URL      = "https://maps.googleapis.com/maps/api/place/textsearch/json"
 	COMPARE_CHARS = 15
+)
+
+var (
+	Lwr = strings.ToLower
 )
 
 type Match struct {
@@ -47,9 +47,9 @@ func (m Match) String() string {
 }
 
 func GetCategory(cat string, cats []string) (string, error) {
-	lcat := strings.ToLower(cat)
+	lcat := Lwr(cat)
 	for _, c := range cats {
-		if strings.ToLower(c) == lcat {
+		if Lwr(c) == lcat {
 			return c, nil
 		}
 	}
@@ -59,18 +59,19 @@ func GetCategory(cat string, cats []string) (string, error) {
 	ms := make([]Match, len(cats))
 	for i, c := range cats {
 		ms[i] = Match{
-			dist: matchr.DamerauLevenshtein(strings.ToLower(c), lcat),
+			dist: matchr.DamerauLevenshtein(Lwr(c), lcat),
 			Name: c,
 		}
 	}
 
 	sort.Slice(ms, func(i, j int) bool { return ms[i].dist < ms[j].dist })
 
+	// TODO return nothing if distance less than X.
 	return "", fmt.Errorf("Category %s not found. Did you mean '%s'",
 		cat, ms[0].Name)
 }
 
-func Categorize(q Query) error {
+func SetCategory(q Query) error {
 	store := NewStore(ConfigData().SheetId)
 	txs, err := store.ReadTransactionTable()
 	if err != nil {
@@ -82,16 +83,16 @@ func Categorize(q Query) error {
 		return err
 	}
 
-	cats, err := store.ReadCategoryTable()
+	tcat, err := store.ReadCategoryTable()
 	if err != nil {
 		return err
 	}
 
-	if len(cats) == 0 {
+	if len(tcat) == 0 {
 		return fmt.Errorf("Category Sheet is empty.")
 	}
 
-	cat, err := GetCategory(q.Cat, catsFromTable(cats))
+	cat, err := GetCategory(q.Val, catsFromTable(tcat))
 	if err != nil {
 		return err
 	}
@@ -104,98 +105,155 @@ func Categorize(q Query) error {
 	return store.WriteTransactionTable(txs)
 }
 
-func CatSearch() ([]Record, error) {
+func AddPlace(place, category string) error {
 	store := NewStore(ConfigData().SheetId)
-	txs, err := store.ReadTransactionTable()
+	tcat, err := store.ReadCategoryTable()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	cats, err := store.ReadCategoryTable()
+	for i, cat := range tcat {
+		name := cat[0]
+		if category == name {
+			if len(cat) == 1 {
+				tcat[i] = append(tcat[i], place)
+
+			} else {
+				for j := 1; j < len(cat); j++ {
+					if cat[j] == place {
+						// already exists
+						return nil
+					}
+				}
+				// doesn't exist
+				tcat[i] = append(tcat[i], place)
+			}
+		}
+	}
+	return store.WriteCategoryTable(tcat)
+}
+
+func AddCat(catName string) error {
+	store := NewStore(ConfigData().SheetId)
+	tcat, err := store.ReadCategoryTable()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	// First see if there are any recommendations we can make based on
-	// internal consistencies.
-	internalTxs := InternalSearch(txs)
-
-	// Now check Google places to see if there any other recommendations.
-	// Pass in all txs updated with Internal search.
-	matches, err := GooglePlaces(AppendDedupeSort(txs, internalTxs), cats)
-	if err != nil {
-		return nil, err
-	}
-
-	placeTxs := []Record{}
-	for _, m := range matches {
-		if m.Category != "" {
-			m.Record.Category = m.Category
-			placeTxs = append(placeTxs, m.Record)
+	// If present skip.
+	for _, cat := range tcat {
+		if Lwr(catName) == Lwr(cat[0]) {
+			return nil
 		}
 	}
 
-	// return only updated transactions
-	return append(internalTxs, placeTxs...), nil
+	tcat = append(tcat, []string{catName})
+	sort.Slice(tcat, func(i, j int) bool { return tcat[i][0] < tcat[j][0] })
+
+	return store.WriteCategoryTable(tcat)
 }
 
-func UnmatchedPlaceSearch() ([]Match, error) {
+func RmCat(catName string) error {
+
+	if catName == UNCATEGORIZED {
+		return fmt.Errorf("Cannot remove category %s. "+
+			"It is a required category.", UNCATEGORIZED)
+	}
+
 	store := NewStore(ConfigData().SheetId)
+	tcat, err := store.ReadCategoryTable()
+	if err != nil {
+		return err
+	}
+
 	txs, err := store.ReadTransactionTable()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	cats, err := store.ReadCategoryTable()
-	if err != nil {
-		return nil, err
-	}
-
-	// Now check Google places to see if there any other recommendations.
-	// Pass in all txs updated with Internal search.
-	matches, err := GooglePlaces(txs, cats)
-	if err != nil {
-		return nil, err
-	}
-
-	unmatched := []Match{}
-	for _, m := range matches {
-		if m.Category == "" {
-			unmatched = append(unmatched, m)
-		}
-	}
-
-	return unmatched, nil
-}
-
-func InternalSearch(txs []Record) []Record {
-	uncat := []Record{}
-	short := []Record{}
-	ftxs := []Record{}
-
-	for _, tx := range txs {
-		if tx.Category == UNCATEGORIZED {
-			uncat = append(uncat, tx)
+	newCats := [][]string{}
+	for _, cat := range tcat {
+		if Lwr(catName) == Lwr(cat[0]) {
+			continue
 		} else {
-			if len(tx.Name) >= COMPARE_CHARS {
-				tx.Name = tx.Name[:COMPARE_CHARS]
-			}
-
-			short = append(short, tx)
+			newCats = append(newCats, cat)
 		}
 	}
 
-	for _, uc := range uncat {
-		for _, s := range short {
-			if strings.HasPrefix(uc.Name, s.Name) {
-				uc.Category = s.Category
-				ftxs = append(ftxs, uc)
-				break
-			}
+	newTxs := []Record{}
+	for _, tx := range txs {
+		if Lwr(catName) == Lwr(tx.Category) {
+			tx.Category = UNCATEGORIZED
+		}
+		newTxs = append(newTxs, tx)
+	}
+
+	err = store.WriteCategoryTable(newCats)
+	if err != nil {
+		return err
+	}
+
+	return store.WriteTransactionTable(newTxs)
+}
+
+func MvCat(fromCat, toCat string) error {
+
+	if fromCat == UNCATEGORIZED {
+		return fmt.Errorf("Cannot move category %s. "+
+			"It is a required category.", UNCATEGORIZED)
+	}
+
+	store := NewStore(ConfigData().SheetId)
+	tcat, err := store.ReadCategoryTable()
+	if err != nil {
+		return err
+	}
+
+	txs, err := store.ReadTransactionTable()
+	if err != nil {
+		return err
+	}
+
+	moved := []string{}
+	for _, cat := range tcat {
+		if Lwr(fromCat) == Lwr(cat[0]) {
+			moved = cat
+			moved[0] = toCat
 		}
 	}
 
-	return ftxs
+	if len(moved) == 0 {
+		return fmt.Errorf("Cannot move none existent category '%s'", fromCat)
+	}
+
+	// Remove mention of any from or to. We write the previously move category
+	// overwriting any Google Places names.
+	newCats := [][]string{}
+	for _, cat := range tcat {
+		if Lwr(toCat) == Lwr(cat[0]) || Lwr(fromCat) == Lwr(cat[0]) {
+			continue
+		} else {
+			newCats = append(newCats, cat)
+		}
+	}
+
+	newCats = append(newCats, moved)
+	sort.Slice(newCats, func(i, j int) bool { return newCats[i][0] < newCats[j][0] })
+
+	newTxs := []Record{}
+	for _, tx := range txs {
+		if Lwr(fromCat) == Lwr(tx.Category) {
+			tx.Category = toCat
+		}
+		newTxs = append(newTxs, tx)
+	}
+
+	err = store.WriteCategoryTable(newCats)
+	if err != nil {
+		return err
+	}
+
+	return store.WriteTransactionTable(newTxs)
 }
 
 func catsFromTable(rows [][]string) []string {
@@ -206,77 +264,10 @@ func catsFromTable(rows [][]string) []string {
 	return cats
 }
 
-func queryUrl(query string) string {
-	return fmt.Sprintf("%s?query=%s&key=%s",
-		TEXT_URL, query, ConfigCreds().GoogleMapsApiKey)
-}
-
-func PlaceType(query string) (string, error) {
-	c, err := maps.NewClient(maps.WithAPIKey(ConfigCreds().GoogleMapsApiKey))
-	if err != nil {
-		return "", err
+func catMapFromTable(rows [][]string) map[string]bool {
+	cats := make(map[string]bool, len(rows))
+	for _, r := range rows {
+		cats[r[0]] = true
 	}
-
-	tSearch := maps.TextSearchRequest{
-		Query: query,
-	}
-	resp, err := c.TextSearch(context.Background(), &tSearch)
-	if err != nil {
-		return "", err
-	}
-
-	var category string
-	if len(resp.Results) > 0 {
-		if len(resp.Results[0].Types) > 0 {
-			category = resp.Results[0].Types[0]
-		}
-	}
-
-	return category, nil
-}
-
-var replDigits *regexp.Regexp = regexp.MustCompile("(.*\\s+)([0-9]+(-?[0-9]+)+)(\\s+.*)")
-
-func GooglePlaces(txs []Record, cats [][]string) ([]Match, error) {
-
-	matches := []Match{}
-	for _, tx := range txs {
-		if tx.Category != UNCATEGORIZED {
-			continue
-		}
-
-		// remove weird digits and whatnot
-		subName := replDigits.ReplaceAllString(tx.Name, "$1$4")
-		gcat, err := PlaceType(subName)
-		if err != nil {
-			if strings.Contains(err.Error(), "ZERO_RESULTS") {
-				continue
-			}
-			return nil, err
-		}
-
-		cat := getCategoryFromRelated(gcat, cats)
-		matches = append(matches, Match{
-			Name:      subName,
-			PlaceType: gcat,
-			Category:  cat,
-			Record:    tx,
-		})
-	}
-
-	return matches, nil
-}
-
-func getCategoryFromRelated(rel string, cats [][]string) string {
-	lrel := strings.ToLower(rel)
-	for _, row := range cats {
-		cat := row[0]
-		for _, v := range row {
-			if strings.ToLower(v) == lrel {
-				return cat
-			}
-		}
-	}
-
-	return ""
+	return cats
 }

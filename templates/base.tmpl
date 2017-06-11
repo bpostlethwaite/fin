@@ -132,7 +132,7 @@
           {{with .Data}}
           {{range .Months}}
           <div id="view-{{.Month}}-aggcat">
-            <h1 class="page-header">{{.Month}}</h1>
+            <h1 class="page-header">{{.Month}} Aggregates</h1>
             <div class="row">
               <div class="col-md-6">
                 <div id="plot-{{.Month}}-aggcat"></div>
@@ -147,13 +147,13 @@
           </div>
 
           <div id="view-{{.Month}}-txs">
-            <h1 class="page-header">{{.Month}}</h1>
+            <h1 class="page-header">{{.Month}} Transactions</h1>
             <div class="row">
               <div class="col-md-6">
                 <div id="plot-{{.Month}}-txs"></div>
               </div>
               <div class="col-md-6">
-                <h2>Monthly Transactions</h2>
+                <h2>Transactions</h2>
                 <div class="table-responsive max-table-height">
                   {{template "txs" .}}
                 </div>
@@ -179,13 +179,13 @@
           </div>
 
           <div id="view-history-txs">
-            <h1 class="page-header">Transactions</h1>
+            <h1 class="page-header">All Transactions</h1>
             <div class="row">
               <div class="col-md-6">
                 <div id="plot-history-txs"></div>
               </div>
               <div class="col-md-6">
-                <h2>All Transactions</h2>
+                <h2>Transactions</h2>
                 <div class="table-responsive max-table-height">
                   {{template "txs" .Data.All}}
                 </div>

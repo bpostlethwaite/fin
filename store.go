@@ -84,18 +84,25 @@ func (s *Store) ClearSheet(clearRange string) error {
 }
 
 func (s *Store) ReadCategoryTable() ([][]string, error) {
-
 	vals, err := s.ReadSheet(CAT_TABLE)
 	if err != nil {
 		return nil, err
 	}
 
 	cats := make([][]string, len(vals))
-	for i, row := range vals {
-		cats[i] = row
+	for i, _ := range vals {
+		cats[i] = vals[i]
 	}
 
 	return cats, nil
+}
+
+func (s *Store) WriteCategoryTable(cats [][]string) error {
+	vals := make([][]interface{}, len(cats))
+	for i, _ := range cats {
+		vals[i] = stringsToInterfaces(cats[i])
+	}
+	return s.WriteSheet(CAT_TABLE, vals)
 }
 
 func NewStore(sheetId string) *Store {
@@ -126,6 +133,14 @@ func stringsFromInteraces(si []interface{}) []string {
 	ss := []string{}
 	for _, s := range si {
 		ss = append(ss, s.(string))
+	}
+	return ss
+}
+
+func stringsToInterfaces(si []string) []interface{} {
+	ss := []interface{}{}
+	for _, s := range si {
+		ss = append(ss, s)
 	}
 	return ss
 }

@@ -1,11 +1,18 @@
 package main
 
 import (
+	"context"
 	"encoding/csv"
+	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path"
 	"strings"
+)
+
+const (
+	CONFIG_ENV_VAR = "FIN_CONFIG_PATH"
 )
 
 func readRawTx() ([]Record, error) {
@@ -116,7 +123,7 @@ func IngestFile(fpath string) error {
 	return store.WriteTransactionTable(txs)
 }
 
-func Ingest() error {
+func IngestCache() error {
 
 	// injest raw input transactions
 	rawtxs, err := readRawTx()
@@ -174,4 +181,25 @@ func unEscape(recs []Record) []Record {
 	}
 
 	return frecs
+}
+
+func RunScripts(script string) error {
+	rawDir := path.Join(Config().ProjectPath, "rawbank")
+	nightwatch := path.Join(rawDir, "node_modules/.bin/nightwatch")
+	scriptarg := ""
+	if script != "" {
+		scriptarg = fmt.Sprintf("--test %s", script)
+	}
+
+	configEnv := fmt.Sprintf("%s=%s", CONFIG_ENV_VAR, *CONFIG_FILE)
+
+	ctx := context.Background()
+	cmd := exec.CommandContext(ctx, nightwatch, scriptarg)
+
+	cmd.Dir = rawDir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Env = append(os.Environ(), configEnv)
+
+	return cmd.Run()
 }
