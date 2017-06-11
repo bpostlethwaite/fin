@@ -129,9 +129,12 @@ func Ingest() error {
 
 	store := NewStore(ConfigData().SheetId)
 
-	// read in transactions held in Google Docs
-
 	txs, err := store.ReadTransactionTable()
+	if err != nil {
+		return err
+	}
+
+	tcat, err := store.ReadCategoryTable()
 	if err != nil {
 		return err
 	}
@@ -140,9 +143,9 @@ func Ingest() error {
 	// changes in txs not present in the raw data itself when filtering.
 	// Filtering takes the more "recent" matching record.
 	txs = AppendDedupeSort(rawtxs, txs)
-
+	cats := catMapFromTable(tcat)
 	for i, _ := range txs {
-		if txs[i].Category == "" {
+		if _, ok := cats[txs[i].Category]; !ok {
 			txs[i].Category = UNCATEGORIZED
 		}
 	}
